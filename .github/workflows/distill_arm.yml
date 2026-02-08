@@ -1,0 +1,35 @@
+name: EMPIRE_DISTILL_V1
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  distill:
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3, 4]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Master Distill
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg aria2 jq
+          TASK=$(jq -r ".[ ${{ matrix.index }} ]" tasks.json)
+          if [ "$TASK" == "null" ] || [ "$TASK" == "" ]; then echo "EMPTY"; exit 0; fi
+          ID=$(echo $TASK | jq -r .id)
+          TITLE=$(echo $TASK | jq -r .title)
+          URL_B64=$(echo $TASK | jq -r .url)
+          URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
+          echo "[*] DISTILLING: $TITLE"
+          mkfifo master_pipe
+          aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "$URL" &
+          ffmpeg -i master_pipe -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset ultrafast -map_metadata -1 -metadata title="[Empire Release] $TITLE" -c:a aac -b:a 192k "empire_$ID.mp4"
+          jq ". += [{\"id\": \"$ID\", \"url\": \"https://empire.storage/distill/$ID\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+          git config --global user.name "IGRIS-ARMADA"
+          git config --global user.email "swarm@empire.void"
+          git add completions.json
+          git commit -m "Produced: $ID" || exit 0
+          git pull origin main --rebase
+          git push origin main
