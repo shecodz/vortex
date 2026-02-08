@@ -3,8 +3,6 @@ name: VORTEX // GHOST_ARMADA
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'tasks.json'
   workflow_dispatch:
 
 jobs:
