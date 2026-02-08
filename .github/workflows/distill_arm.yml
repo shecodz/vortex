@@ -29,33 +29,37 @@ jobs:
     - name: Master Distill
       run: |
         # 1. Select task
-        TASK=
-        if [ "" == "null" ]; then
+        TASK=$(jq -r ".[ ${{ matrix.index }} ]" tasks.json)
+        if [ "$TASK" == "null" ]; then
           echo "[.] No task. Idling."
           exit 0
         fi
 
-        ID=
-        TITLE=
-        URL_B64=
-        URL=
+        ID=$(echo $TASK | jq -r .id)
+        TITLE=$(echo $TASK | jq -r .title)
+        URL_B64=$(echo $TASK | jq -r .url)
+        URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
 
-        echo "[*] TARGET:  (ID: )"
+        echo "[*] TARGET: $TITLE (ID: $ID)" 
         
         mkfifo master_pipe
-        aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "" &
+        aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "$URL" &
         
-        ffmpeg -i master_pipe           -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium           -map_metadata -1 -metadata title="[Empire Release] "           -c:a aac -b:a 192k           "empire_.mp4"
+        ffmpeg -i master_pipe \
+          -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium \
+          -map_metadata -1 -metadata title="[Empire Release] $TITLE" \
+          -c:a aac -b:a 192k \
+          "empire_$ID.mp4"
 
-        PRODUCED_URL="https://empire.storage/distill/"
+        PRODUCED_URL="https://empire.storage/distill/$ID"
         
-        # Pull to avoid conflicts
+        # Sync and update completions
         git config --global user.name "IGRIS-ARMADA"
         git config --global user.email "swarm@empire.void"
         git pull origin main --rebase
         
-        jq ". += [{\"id\": \"\", \"url\": \"\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+        jq ". += [{"id": "$ID", "url": "$PRODUCED_URL"}]" completions.json > completions.tmp && mv completions.tmp completions.json
         
         git add completions.json
-        git commit -m "Distill Complete: "
+        git commit -m "Distill Complete: $ID"
         git push origin main
