@@ -12,32 +12,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Shadow Checkout (Bypassing restricted actions)
           git init
           git remote add origin https://x-access-token:${GH_TOKEN}@github.com/shecodz/vortex.git
           git fetch --depth 1 origin main
           git checkout main
           
-          # 2. Dependency Injection
-          sudo apt-get update && sudo apt-get install -y ffmpeg aria2 jq
+          sudo apt-get update && sudo apt-get install -y ffmpeg curl jq
           
-          # 3. Task Selection
           TASK=$(jq -r ".[ 0 ]" tasks.json)
-          if [ "$TASK" == "null" ] || [ "$TASK" == "" ]; then 
-            echo "[!] No tasks in queue."
-            exit 0
-          fi
+          if [ "$TASK" == "null" ] || [ "$TASK" == "" ]; then exit 0; fi
           
           ID=$(echo $TASK | jq -r .id)
           TITLE=$(echo $TASK | jq -r .title)
           URL_B64=$(echo $TASK | jq -r .url)
           URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
           
-          echo "[*] TARGET: $TITLE (ID: $ID)"
+          echo "[*] TARGET: $TITLE"
           
-          # 4. Master Distill (Streaming)
+          # Use curl for sequential streaming (No Seek)
           mkfifo master_pipe
-          aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "$URL" &
+          curl -L -s "$URL" > master_pipe &
           
           ffmpeg -i master_pipe \
             -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset ultrafast \
@@ -45,10 +39,9 @@ jobs:
             -c:a aac -b:a 192k \
             "empire_$ID.mp4"
           
-          # 5. Commissioning
+          # Commissioning
           jq ". += [{\"id\": \"$ID\", \"url\": \"https://empire.storage/distill/$ID\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
           
-          # 6. Synchronizing State
           git config --global user.name "IGRIS-ARMADA"
           git config --global user.email "swarm@empire.void"
           git add completions.json
