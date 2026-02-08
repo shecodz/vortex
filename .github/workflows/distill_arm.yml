@@ -1,0 +1,61 @@
+name: VORTEX // GHOST_ARMADA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  distill:
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3, 4]
+      fail-fast: false
+
+    steps:
+    - name: Checkout Registry
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg aria2 jq
+
+    - name: Master Distill
+      run: |
+        # 1. Select task
+        TASK=
+        if [ "" == "null" ]; then
+          echo "[.] No task. Idling."
+          exit 0
+        fi
+
+        ID=
+        TITLE=
+        URL_B64=
+        URL=
+
+        echo "[*] TARGET:  (ID: )"
+        
+        mkfifo master_pipe
+        aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "" &
+        
+        ffmpeg -i master_pipe           -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium           -map_metadata -1 -metadata title="[Empire Release] "           -c:a aac -b:a 192k           "empire_.mp4"
+
+        PRODUCED_URL="https://empire.storage/distill/"
+        
+        # Pull to avoid conflicts
+        git config --global user.name "IGRIS-ARMADA"
+        git config --global user.email "swarm@empire.void"
+        git pull origin main --rebase
+        
+        jq ". += [{\"id\": \"\", \"url\": \"\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+        
+        git add completions.json
+        git commit -m "Distill Complete: "
+        git push origin main
