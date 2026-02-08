@@ -1,8 +1,8 @@
 name: GHOST_ARMADA_MATRIX
 on: [push]
 jobs:
-  distill:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         index: [0, 1]
