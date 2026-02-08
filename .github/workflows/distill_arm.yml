@@ -1,7 +1,10 @@
-name: GHOST_ARMADA_REBORN
+name: GHOST_ARMADA_MATRIX
 on: [push]
 jobs:
-  test:
+  distill:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        index: [0, 1]
     steps:
-      - run: echo 'READY'
+      - run: echo "INDEX: ${{ matrix.index }}"
