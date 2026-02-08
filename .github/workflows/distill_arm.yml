@@ -1,10 +1,7 @@
-name: GHOST_ARMADA_MATRIX
+name: ARM_GHOST
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-24.04-arm
-    strategy:
-      matrix:
-        index: [0, 1]
     steps:
-      - run: echo "INDEX: ${{ matrix.index }}"
+      - run: echo "ARM_ALIVE"
