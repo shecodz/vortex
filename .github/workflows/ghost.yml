@@ -1,28 +1,8 @@
-name: GHOST_ARMADA
+name: ARM_GHOST
 on: [push]
 jobs:
-  distill:
+  test:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg aria2 jq
-      - name: Master Distill
-        run: |
-          TASK=$(jq -r \".[ 0 ]\" tasks.json)
-          ID=$(echo $TASK | jq -r .id)
-          TITLE=$(echo $TASK | jq -r .title)
-          URL_B64=$(echo $TASK | jq -r .url)
-          URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
-          echo \"[*] TARGET: $TITLE\"
-          mkfifo master_pipe
-          aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true \"$URL\" &
-          ffmpeg -i master_pipe -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium -map_metadata -1 -metadata title=\"[Empire Release] $TITLE\" -c:a aac -b:a 192k \"empire_$ID.mp4\"
-          jq \". += [{\\"id\\": \\"$ID\\", \\"url\\": \\"https://empire.storage/distill/$ID\\"}]\" completions.json > completions.tmp && mv completions.tmp completions.json
-      - name: Push
-        run: |
-          git config --global user.name \"IGRIS-ARMADA\"
-          git config --global user.email \"swarm@empire.void\"
-          git add completions.json
-          git commit -m \"Distill Complete\" || exit 0
-          git push origin main
+      - run: echo "INDEX: 0"
