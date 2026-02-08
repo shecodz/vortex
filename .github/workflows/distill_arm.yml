@@ -3,9 +3,9 @@ name: VORTEX // GHOST_ARMADA
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'tasks.json'
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 
 jobs:
   distill:
@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout Registry
+    - name: Checkout Monolith
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
@@ -28,10 +28,10 @@ jobs:
 
     - name: Master Distill
       run: |
-        # 1. Select task
+        # 1. Select task from local tasks.json
         TASK=$(jq -r ".[ ${{ matrix.index }} ]" tasks.json)
         if [ "$TASK" == "null" ]; then
-          echo "[.] No task. Idling."
+          echo "[.] No task for index ${{ matrix.index }}. Idling."
           exit 0
         fi
 
@@ -41,10 +41,15 @@ jobs:
         URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
 
         echo "[*] TARGET: $TITLE (ID: $ID)" 
-        
+        echo "[!] INITIALIZING STREAMING DISTILL..."
+
+        # 2. Named Pipe Hack
         mkfifo master_pipe
+        
+        # 3. Start Leech
         aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "$URL" &
         
+        # 4. Execute Distill
         ffmpeg -i master_pipe \
           -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium \
           -map_metadata -1 -metadata title="[Empire Release] $TITLE" \
@@ -53,13 +58,16 @@ jobs:
 
         PRODUCED_URL="https://empire.storage/distill/$ID"
         
-        # Sync and update completions
+        # 5. Update completions.json
+        jq ". += [{\"id\": \"$ID\", \"url\": \"$PRODUCED_URL\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+        
+        echo "[+] Commissioned: $TITLE"
+
+    - name: Commit & Push
+      run: |
         git config --global user.name "IGRIS-ARMADA"
         git config --global user.email "swarm@empire.void"
-        git pull origin main --rebase
-        
-        jq ". += [{"id": "$ID", "url": "$PRODUCED_URL"}]" completions.json > completions.tmp && mv completions.tmp completions.json
-        
         git add completions.json
-        git commit -m "Distill Complete: $ID"
+        git commit -m "Distill Complete: Batch ${{ matrix.index }}" || echo "Nothing to commit"
+        # Use GITHUB_TOKEN for push
         git push origin main
