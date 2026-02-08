@@ -1,8 +1,7 @@
-name: GHOST_ARMADA
+name: GHOST_ARMADA_REBORN
 on: [push]
 jobs:
-  distill:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: echo "ALIVE"
+      - run: echo 'READY'
