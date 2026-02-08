@@ -1,7 +1,72 @@
-name: ARM_GHOST
-on: [push]
+name: GHOST_ARMADA
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
-  test:
+  distill:
     runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3, 4]
+      fail-fast: false
+
     steps:
-      - run: echo "ARM_ALIVE"
+    - name: Checkout Monolith
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg aria2 jq
+
+    - name: Master Distill
+      run: |
+        # Select task
+        TASK=$(jq -r ".[ ${{ matrix.index }} ]" tasks.json)
+        if [ "$TASK" == "null" ] || [ "$TASK" == "" ]; then
+          echo "[.] No task for index ${{ matrix.index }}. Idling."
+          exit 0
+        fi
+
+        ID=$(echo $TASK | jq -r .id)
+        TITLE=$(echo $TASK | jq -r .title)
+        URL_B64=$(echo $TASK | jq -r .url)
+        URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
+
+        echo "[*] TARGET: $TITLE (ID: $ID)" 
+        
+        # Named Pipe Hack
+        mkfifo master_pipe
+        
+        # Start Leech
+        aria2c -s 16 -x 16 --out=master_pipe --allow-overwrite=true "$URL" &
+        
+        # Execute Distill
+        ffmpeg -i master_pipe \
+          -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset medium \
+          -map_metadata -1 -metadata title="[Empire Release] $TITLE" \
+          -c:a aac -b:a 192k \
+          "empire_$ID.mp4"
+
+        PRODUCED_URL="https://empire.storage/distill/$ID" 
+        
+        # Update completions.json
+        jq ". += [{\"id\": \"$ID\", \"url\": \"$PRODUCED_URL\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+        
+        echo "[+] Commissioned: $TITLE"
+
+    - name: Commit & Push
+      run: |
+        git config --global user.name "IGRIS-ARMADA"
+        git config --global user.email "swarm@empire.void"
+        git add completions.json
+        git commit -m "Distill Complete: Batch ${{ matrix.index }}" || exit 0
+        git pull origin main --rebase
+        git push origin main
