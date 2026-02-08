@@ -1,4 +1,4 @@
-name: VORTEX // GHOST_ARMADA
+name: GHOST_ARMADA
 on: [push]
 jobs:
   distill:
