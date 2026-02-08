@@ -7,16 +7,12 @@ on:
 jobs:
   distill:
     runs-on: ubuntu-24.04-arm
-    strategy:
-      matrix:
-        index: [0, 1, 2, 3, 4]
-      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - name: Master Distill
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg aria2 jq
-          TASK=$(jq -r ".[ ${{ matrix.index }} ]" tasks.json)
+          TASK=$(jq -r ".[ 0 ]" tasks.json)
           if [ "$TASK" == "null" ] || [ "$TASK" == "" ]; then echo "EMPTY"; exit 0; fi
           ID=$(echo $TASK | jq -r .id)
           TITLE=$(echo $TASK | jq -r .title)
