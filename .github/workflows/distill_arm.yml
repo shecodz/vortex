@@ -13,7 +13,7 @@ jobs:
         env:
           DO_ACCESS_KEY: DO00KZYF73XCB98PKALL
           DO_SECRET_KEY: lOpuOpgkzTWO51fKiD4uo3DCqgoH5UGWy9wt76EiOfI
-          DO_BUCKET: vasanthandco
+          DO_BUCKET: empire-vault-2026
           DO_ENDPOINT: https://blr1.digitaloceanspaces.com
           DO_REGION: blr1
         run: |
