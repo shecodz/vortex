@@ -1,4 +1,4 @@
-name: EMPIRE_DISTILL_V4
+name: EMPIRE_DISTILL_V5
 on:
   push:
     branches: [ main ]
@@ -10,7 +10,6 @@ jobs:
     steps:
       - name: Manual Artery Checkout (Stealth Bypass)
         run: |
-          # Bypassing restricted actions/checkout@v4
           git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" .
           
       - name: Master Distill & Secure (Visually Lossless)
@@ -21,7 +20,18 @@ jobs:
           DO_ENDPOINT: https://blr1.digitaloceanspaces.com
           DO_REGION: blr1
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg jq curl awscli
+          # Use python3-pip to install awscli if apt-get fails
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq curl python3-pip unzip
+          pip3 install awscli --break-system-packages || echo "[! ] Pip install failed, trying manual binary..."
+          
+          # Verify aws command
+          if ! command -v aws &> /dev/null; then
+            echo "[*] Installing AWS CLI V2 Manually (ARM64)..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install --update
+          fi
           
           # Pull the next task
           TASK=$(jq -r '.[]' tasks.json | head -n 1)
