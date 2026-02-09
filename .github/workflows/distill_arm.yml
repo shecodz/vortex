@@ -1,4 +1,4 @@
-name: EMPIRE_DISTILL_V2
+name: EMPIRE_DISTILL_V3
 on:
   push:
     branches: [ main ]
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - name: Master Distill & Secure
+      - name: Master Distill & Secure (Visually Lossless)
         env:
           DO_ACCESS_KEY: DO00KZYF73XCB98PKALL
           DO_SECRET_KEY: lOpuOpgkzTWO51fKiD4uo3DCqgoH5UGWy9wt76EiOfI
@@ -30,32 +30,34 @@ jobs:
           
           echo "[*] TARGET: $TITLE (ID: $ID)"
           
-          # Direct Stream Distill
+          # HIGH QUALITY DISTILL: CRF 18 (Visually Lossless) + Preset Fast
+          # Preserves 10-bit HDR and 4K resolution while stripping studio tracking tags.
           ffmpeg -i "$URL" \
-            -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset ultrafast \
+            -c:v libx265 -pix_fmt yuv420p10le -crf 18 -preset fast \
             -map_metadata -1 -metadata title="[Empire Release] $TITLE" \
-            -c:a aac -b:a 192k \
+            -c:a aac -b:a 256k \
             "empire_$ID.mp4"
           
-          # UPLOAD TO DIGITALOCEAN SPACES
-          echo "[*] SECURING PAYLOAD TO THE EMPIRE VAULT (DO)..."
+          # UPLOAD TO HIDDEN VAULT
+          echo "[*] SECURING NATIVE PAYLOAD TO THE EMPIRE VAULT..."
           export AWS_ACCESS_KEY_ID=$DO_ACCESS_KEY
           export AWS_SECRET_ACCESS_KEY=$DO_SECRET_KEY
           
           aws s3 cp "empire_$ID.mp4" "s3://$DO_BUCKET/test-uploads/.sys_cache/empire_$ID.mp4" \
             --endpoint-url $DO_ENDPOINT --acl public-read
           
+          # Direct Native URL (No Redirects)
           DOWNLOAD_URL="https://$DO_BUCKET.$DO_REGION.digitaloceanspaces.com/test-uploads/.sys_cache/empire_$ID.mp4"
           
           if [ $? -eq 0 ]; then
-            echo "[+] PAYLOAD SECURED: $DOWNLOAD_URL"
+            echo "[+] NATIVE PAYLOAD SECURED: $DOWNLOAD_URL"
             # Update Artery
-            jq ". += [{"id": $ID, "url": \"$DOWNLOAD_URL\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+            jq ". += [{\"id\": $ID, \"url\": \"$DOWNLOAD_URL\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
             
             git config --global user.name "IGRIS-ARMADA"
             git config --global user.email "swarm@empire.void"
             git add completions.json
-            git commit -m "Produced: $ID"
+            git commit -m "Produced (High-Q): $ID"
             git pull origin main --rebase
             git push origin main
           else
