@@ -1,0 +1,64 @@
+name: EMPIRE_DISTILL_V2
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  distill:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Master Distill & Secure
+        env:
+          DO_ACCESS_KEY: DO00KZYF73XCB98PKALL
+          DO_SECRET_KEY: lOpuOpgkzTWO51fKiD4uo3DCqgoH5UGWy9wt76EiOfI
+          DO_BUCKET: vasanthandco
+          DO_ENDPOINT: https://blr1.digitaloceanspaces.com
+          DO_REGION: blr1
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg jq curl awscli
+          
+          # Pull the next task
+          TASK=$(jq -r '.[]' tasks.json | head -n 1)
+          if [ -z "$TASK" ] || [ "$TASK" == "null" ]; then echo "EMPTY_OR_PENDING"; exit 0; fi
+          
+          ID=$(echo $TASK | jq -r .id)
+          TITLE=$(echo $TASK | jq -r .title)
+          URL_B64=$(echo $TASK | jq -r .url)
+          URL=$(echo $URL_B64 | sed 's/b64://' | base64 -d)
+          
+          echo "[*] TARGET: $TITLE (ID: $ID)"
+          
+          # Direct Stream Distill
+          ffmpeg -i "$URL" \
+            -c:v libx265 -pix_fmt yuv420p10le -crf 22 -preset ultrafast \
+            -map_metadata -1 -metadata title="[Empire Release] $TITLE" \
+            -c:a aac -b:a 192k \
+            "empire_$ID.mp4"
+          
+          # UPLOAD TO DIGITALOCEAN SPACES
+          echo "[*] SECURING PAYLOAD TO THE EMPIRE VAULT (DO)..."
+          export AWS_ACCESS_KEY_ID=$DO_ACCESS_KEY
+          export AWS_SECRET_ACCESS_KEY=$DO_SECRET_KEY
+          
+          aws s3 cp "empire_$ID.mp4" "s3://$DO_BUCKET/empire_releases/empire_$ID.mp4" \
+            --endpoint-url $DO_ENDPOINT --acl public-read
+          
+          DOWNLOAD_URL="https://$DO_BUCKET.$DO_REGION.digitaloceanspaces.com/empire_releases/empire_$ID.mp4"
+          
+          if [ $? -eq 0 ]; then
+            echo "[+] PAYLOAD SECURED: $DOWNLOAD_URL"
+            # Update Artery
+            jq ". += [{"id": $ID, "url": \"$DOWNLOAD_URL\"}]" completions.json > completions.tmp && mv completions.tmp completions.json
+            
+            git config --global user.name "IGRIS-ARMADA"
+            git config --global user.email "swarm@empire.void"
+            git add completions.json
+            git commit -m "Produced: $ID"
+            git pull origin main --rebase
+            git push origin main
+          else
+            echo "[-] UPLOAD FAILED"
+            exit 1
+          fi
