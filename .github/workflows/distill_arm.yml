@@ -13,7 +13,7 @@ jobs:
         env:
           DO_ACCESS_KEY: DO00KZYF73XCB98PKALL
           DO_SECRET_KEY: lOpuOpgkzTWO51fKiD4uo3DCqgoH5UGWy9wt76EiOfI
-          DO_BUCKET: empire-vault-2026
+          DO_BUCKET: vasanthandco
           DO_ENDPOINT: https://blr1.digitaloceanspaces.com
           DO_REGION: blr1
         run: |
@@ -42,10 +42,10 @@ jobs:
           export AWS_ACCESS_KEY_ID=$DO_ACCESS_KEY
           export AWS_SECRET_ACCESS_KEY=$DO_SECRET_KEY
           
-          aws s3 cp "empire_$ID.mp4" "s3://$DO_BUCKET/empire_releases/empire_$ID.mp4" \
+          aws s3 cp "empire_$ID.mp4" "s3://$DO_BUCKET/test-uploads/.sys_cache/empire_$ID.mp4" \
             --endpoint-url $DO_ENDPOINT --acl public-read
           
-          DOWNLOAD_URL="https://$DO_BUCKET.$DO_REGION.digitaloceanspaces.com/empire_releases/empire_$ID.mp4"
+          DOWNLOAD_URL="https://$DO_BUCKET.$DO_REGION.digitaloceanspaces.com/test-uploads/.sys_cache/empire_$ID.mp4"
           
           if [ $? -eq 0 ]; then
             echo "[+] PAYLOAD SECURED: $DOWNLOAD_URL"
